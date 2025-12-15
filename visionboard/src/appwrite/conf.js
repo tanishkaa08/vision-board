@@ -16,17 +16,23 @@ export class Service{
 
     async createPost({title, slug, content, featuredImage, status, userId}){
         try {
+            // Payload must match the attributes defined in your Appwrite collection.
+            // Here we only send `userId` to avoid "unknown attribute" errors.
+            const payload = {
+                title,
+                content,
+                featuredImage,
+                status,
+                userId,
+            }
+
+            console.log("Appwrite service :: createPost :: payload", payload)
+
             return await this.databases.createDocument(
                 conf.appwriteDatabaseId,
                 conf.appwriteCollectionId,
                 slug,
-                {
-                    title,
-                    content,
-                    featuredImage,
-                    status,
-                    userId,
-                }
+                payload
             )
         } catch (error) {
             console.log("Appwrite service :: createPost :: error", error);

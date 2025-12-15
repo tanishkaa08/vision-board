@@ -15,10 +15,13 @@ function Signup() {
     const create = async(data) => {
         setError("")
         try {
-            const userData = await authService.createAccount(data)
-            if (userData) {
+            const created = await authService.createAccount(data)
+            if (created) {
                 const userData = await authService.getCurrentUser()
-                if(userData) dispatch(login(userData));
+                if (userData) {
+                    // authSlice expects payload shape: { userData }
+                    dispatch(login({ userData }));
+                }
                 navigate("/")
             }
         } catch (error) {

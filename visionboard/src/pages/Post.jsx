@@ -32,15 +32,23 @@ export default function Post() {
         });
     };
 
+    const imageUrl = post?.featuredImage
+        ? appwriteService.getFilePreview(post.featuredImage)
+        : null;
+
     return post ? (
         <div className="py-8">
             <Container>
-                <div className="w-full flex justify-center mb-4 relative border rounded-xl p-2">
-                    <img
-                        src={appwriteService.getFilePreview(post.featuredImage)}
-                        alt={post.title}
-                        className="rounded-xl"
-                    />
+                <div className="w-full flex justify-center mb-4 relative border rounded-xl p-2 min-h-[200px] bg-white">
+                    {imageUrl ? (
+                        <img
+                            src={imageUrl}
+                            alt={post.title}
+                            className="rounded-xl max-h-[480px] object-contain"
+                        />
+                    ) : (
+                        <div className="text-gray-500 text-sm">No image available</div>
+                    )}
 
                     {isAuthor && (
                         <div className="absolute right-6 top-6">

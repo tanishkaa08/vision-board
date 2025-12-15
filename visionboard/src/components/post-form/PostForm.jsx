@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input, RTE, Select } from "..";
 import appwriteService from "../../appwrite/conf";
@@ -15,37 +15,74 @@ export default function PostForm({ post }) {
         },
     });
 
+    const [submitting, setSubmitting] = useState(false);
+    const [message, setMessage] = useState("");
+    const [previewImage, setPreviewImage] = useState(null);
+
     const navigate = useNavigate();
     const userData = useSelector((state) => state.auth.userData);
 
     const submit = async (data) => {
-        if (post) {
-            const file = data.image[0] ? await appwriteService.uploadFile(data.image[0]) : null;
-
-            if (file) {
-                appwriteService.deleteFile(post.featuredImage);
+        try {
+            setMessage("");
+            setSubmitting(true);
+            // Ensure we have an authenticated user for creating / updating posts
+            if (!userData || !userData.$id) {
+                alert("You must be logged in to create or edit a post.");
+                setSubmitting(false);
+                return;
             }
 
-            const dbPost = await appwriteService.updatePost(post.$id, {
-                ...data,
-                featuredImage: file ? file.$id : undefined,
-            });
+            if (post) {
+                const file = data.image?.[0]
+                    ? await appwriteService.uploadFile(data.image[0])
+                    : null;
 
-            if (dbPost) {
-                navigate(`/post/${dbPost.$id}`);
-            }
-        } else {
-            const file = await appwriteService.uploadFile(data.image[0]);
+                if (file && post.featuredImage) {
+                    // Best-effort cleanup of old image; ignore failures
+                    appwriteService.deleteFile(post.featuredImage);
+                }
 
-            if (file) {
-                const fileId = file.$id;
-                data.featuredImage = fileId;
-                const dbPost = await appwriteService.createPost({ ...data, userId: userData.$id });
+                const dbPost = await appwriteService.updatePost(post.$id, {
+                    ...data,
+                    featuredImage: file ? file.$id : undefined,
+                });
 
-                if (dbPost) {
+                if (dbPost && dbPost.$id) {
+                    setMessage("Post updated! Redirecting...");
                     navigate(`/post/${dbPost.$id}`);
+                } else {
+                    alert("Post was not updated. Please try again.");
+                }
+            } else {
+                const file = data.image?.[0]
+                    ? await appwriteService.uploadFile(data.image[0])
+                    : null;
+
+                if (!file || !file.$id) {
+                    alert("Image upload failed. Please try again.");
+                    setSubmitting(false);
+                    return;
+                }
+
+                data.featuredImage = file.$id;
+                const dbPost = await appwriteService.createPost({
+                    ...data,
+                    userId: userData.$id,
+                });
+
+                if (dbPost && dbPost.$id) {
+                    setMessage("Post created! Redirecting...");
+                    navigate(`/post/${dbPost.$id}`);
+                } else {
+                    alert("Post was not created. Please try again.");
                 }
             }
+        } catch (error) {
+            console.error("Error while submitting post:", error);
+            alert(error?.message || "Something went wrong while saving the post.");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -97,6 +134,12 @@ export default function PostForm({ post }) {
                     className="mb-4"
                     accept="image/png, image/jpg, image/jpeg, image/gif"
                     {...register("image", { required: !post })}
+                    onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                            setPreviewImage(URL.createObjectURL(file));
+                        }
+                    }}
                 />
                 {post && (
                     <div className="w-full mb-4">
@@ -107,15 +150,32 @@ export default function PostForm({ post }) {
                         />
                     </div>
                 )}
+                {previewImage && (
+                    <div className="w-full mb-4">
+                        <img
+                            src={previewImage}
+                            alt="Preview"
+                            className="rounded-lg border border-gray-200"
+                        />
+                    </div>
+                )}
                 <Select
                     options={["active", "inactive"]}
                     label="Status"
                     className="mb-4"
                     {...register("status", { required: true })}
                 />
-                <Button type="submit" bgColor={post ? "bg-green-500" : undefined} className="w-full">
-                    {post ? "Update" : "Submit"}
+                <Button
+                    type="submit"
+                    bgColor={post ? "bg-green-500" : undefined}
+                    className="w-full disabled:opacity-50"
+                    disabled={submitting}
+                >
+                    {submitting ? "Saving..." : post ? "Update" : "Submit"}
                 </Button>
+                {message && (
+                    <p className="mt-3 text-sm text-green-600 text-center">{message}</p>
+                )}
             </div>
         </form>
     );
